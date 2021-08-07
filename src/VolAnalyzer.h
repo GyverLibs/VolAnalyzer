@@ -15,6 +15,7 @@
 
     Версии:
     v1.0 - релиз
+    v1.1 - более резкое падение при пропадании звука
 */
 
 #ifndef VolAnalyzer_h
@@ -137,7 +138,7 @@ public:
                     if (max < mins) mins = max;       // минимумы реди максимумов
                     rawMax = maxs;
                     maxF.checkPass(max);              // проверка выше максимума
-                    if (getMax() - getMin() < _trsh) max = 0; // если окно громкости меньше порого то 0
+                    if (/*getMax()*/raw - getMin() < _trsh) max = 0; // если окно громкости меньше порого то 0
                     else max = constrain(map(max, getMin(), getMax(), _volMin, _volMax), _volMin, _volMax); // перевод в громкость
                     volF.setRaw(max);                         // фильтр столбика громкости
                     if (volF.checkPass(max)) _pulse = 1;      // проверка выше максимума
