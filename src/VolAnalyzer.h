@@ -16,12 +16,13 @@
     Версии:
     v1.0 - релиз
     v1.1 - более резкое падение при пропадании звука
+    v1.2 - +совместимость. Вернул плавное падение звука
 */
 
 #ifndef VolAnalyzer_h
 #define VolAnalyzer_h
 #include <Arduino.h>
-#include "FastFilter.h"
+#include "FastFilterVA.h"
 
 class VolAnalyzer {
 public:
@@ -133,12 +134,12 @@ public:
 
                 if (++count >= _window) {           // выборка завершена
                     tmr1 = millis();
-                    raw = max;
+                    raw = max;                    
                     if (max > maxs) maxs = max;       // максимумы среди максимумов
                     if (max < mins) mins = max;       // минимумы реди максимумов
                     rawMax = maxs;
                     maxF.checkPass(max);              // проверка выше максимума
-                    if (/*getMax()*/raw - getMin() < _trsh) max = 0; // если окно громкости меньше порого то 0
+                    if (getMax()/*raw*/ - getMin() < _trsh) max = 0; // если окно громкости меньше порого то 0
                     else max = constrain(map(max, getMin(), getMax(), _volMin, _volMax), _volMin, _volMax); // перевод в громкость
                     volF.setRaw(max);                         // фильтр столбика громкости
                     if (volF.checkPass(max)) _pulse = 1;      // проверка выше максимума
@@ -182,6 +183,6 @@ private:
     int maxs = 0, mins = 1023;
     int _volMin = 0, _volMax = 100, _trsh = 30;
     bool _pulse = 0, _first = 0;    
-    FastFilter minF, maxF, volF;
+    FastFilterVA minF, maxF, volF;
 };
 #endif
