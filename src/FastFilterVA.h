@@ -18,7 +18,7 @@ public:
     // коэффициент 0-31
     void setK(byte k) {
         _k1 = k;
-        _k2 = 32 - k;
+        _k2 = k / 2;
     }
     
     // установить период фильтрации
@@ -40,19 +40,7 @@ public:
     void setFil(int fil) {
         _raw_f = fil;
     }
-    
-    // проверка на переполнение
-    bool checkPass(int val) {
-        if (_pass == FF_PASS_MAX && val > _raw_f) {
-            _raw_f = val;
-            return 1;
-        } else if (_pass == FF_PASS_MIN && val < _raw_f) {
-            _raw_f = val;
-            return 1;
-        }
-        return 0;
-    }
-    
+        
     // расчёт по таймеру
     void compute() {
         if (_dt == 0 || millis() - _tmr >= _dt) {
@@ -63,7 +51,10 @@ public:
     
     // произвести расчёт сейчас
     void computeNow() {
-        _raw_f = (_k1 * _raw_f + _k2 * _raw) >> 5;
+        int k = _k1;
+        if ((_pass == FF_PASS_MAX && _raw > _raw_f) 
+            || (_pass == FF_PASS_MIN && _raw < _raw_f)) k = _k2;               
+        _raw_f = (k * _raw_f + (32 - k) * _raw) >> 5;
     }
     
     // получить фильтрованное значение

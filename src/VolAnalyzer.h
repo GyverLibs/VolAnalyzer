@@ -18,6 +18,7 @@
     v1.1 - более резкое падение при пропадании звука
     v1.2 - +совместимость. Вернул плавное падение звука
     v1.3 - упрощение алгоритма. Новый обработчик импульсов
+    v1.4 - улучшение алгоритма
 */
 
 #ifndef VolAnalyzer_h
@@ -32,6 +33,7 @@ public:
         volF.setDt(20);
         volF.setPass(FF_PASS_MAX);
         maxF.setPass(FF_PASS_MAX);
+        minF.setPass(FF_PASS_MIN);
         setVolK(25);
         setAmpliK(30);
         if (pin != -1) setPin(pin);
@@ -171,10 +173,9 @@ public:
                 if (_max > _maxs) _maxs = _max;     // максимумы среди максимумов
                 if (_max < _mins) _mins = _max;     // минимумы реди максимумов
                 _rawMax = _maxs;                    // запомнили
-                maxF.checkPass(_max);               // проверка выше максимума
                 if (getMax() - getMin() < _trsh) _max = 0; // если окно громкости меньше порога, то 0
                 else _max = constrain(map(_max, getMin(), getMax(), _volMin, _volMax), _volMin, _volMax); // перевод в громкость
-                volF.setRaw(_max);                         // фильтр столбика громкости
+                volF.setRaw(_max);                  // фильтр столбика громкости
                 
                 // обработка пульса
                 if (!_pulseState) {
