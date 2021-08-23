@@ -1,16 +1,16 @@
-// быстрый целочисленный экспоненциальный фильтр
+// быстрый целочисленный экспоненциальный фильтр (только int)
 
-#ifndef FastFilter_h
-#define FastFilter_h
+#ifndef FastFilterVA_h
+#define FastFilterVA_h
 #include <Arduino.h>
 
 #define FF_PASS_MAX 1
 #define FF_PASS_MIN 2
 
-class FastFilter {
+class FastFilterVA {
 public:
     // коэффициент 0-31
-    FastFilter(byte k = 20, int dt = 0) {
+    FastFilterVA(byte k = 20, int dt = 0) {
         setK(k);
         setDt(dt);
     }

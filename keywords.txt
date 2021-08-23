@@ -29,6 +29,9 @@ tick	KEYWORD2
 getRaw	KEYWORD2
 getRawMax	KEYWORD2
 getPulse	KEYWORD2
+setPulseTrsh	KEYWORD2
+setPulseMin	KEYWORD2
+setPulseTimeout	KEYWORD2
 
 #######################################
 # Constants (LITERAL1)
