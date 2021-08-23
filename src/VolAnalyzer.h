@@ -17,7 +17,10 @@
     v1.0 - релиз
     v1.1 - более резкое падение при пропадании звука
     v1.2 - +совместимость. Вернул плавное падение звука
+<<<<<<< HEAD
     v1.3 - упрощение алгоритма. Новый обработчик импульсов
+=======
+>>>>>>> aed097ca265e4e5a09eda34c0b0980c8b2828623
 */
 
 #ifndef VolAnalyzer_h
@@ -166,6 +169,7 @@ public:
                 minF.setFil(thisRead);
             }
 
+<<<<<<< HEAD
             if (++count >= _window) {               // выборка завершена
                 _raw = _max;                        // запомнили
                 if (_max > _maxs) _maxs = _max;     // максимумы среди максимумов
@@ -185,6 +189,21 @@ public:
                         _pulse = 1;
                         _tmrPulse = millis();
                     }
+=======
+                if (++count >= _window) {           // выборка завершена
+                    tmr1 = millis();
+                    raw = max;                    
+                    if (max > maxs) maxs = max;       // максимумы среди максимумов
+                    if (max < mins) mins = max;       // минимумы реди максимумов
+                    rawMax = maxs;
+                    maxF.checkPass(max);              // проверка выше максимума
+                    if (getMax()/*raw*/ - getMin() < _trsh) max = 0; // если окно громкости меньше порого то 0
+                    else max = constrain(map(max, getMin(), getMax(), _volMin, _volMax), _volMin, _volMax); // перевод в громкость
+                    volF.setRaw(max);                         // фильтр столбика громкости
+                    if (volF.checkPass(max)) _pulse = 1;      // проверка выше максимума
+                    max = count = 0;
+                    return true;                              // выборка завершена
+>>>>>>> aed097ca265e4e5a09eda34c0b0980c8b2828623
                 }
                 _max = count = 0;
                 return true;                              // выборка завершена
@@ -196,6 +215,7 @@ public:
 private:
     // дефолты
     int _dt = 500;      // 500 мкс между сэмплами достаточно для музыки
+<<<<<<< HEAD
     int _ampliDt = 150; // сглаживание амплитудных огибающих
     int _window = 20;   // при таком размере окна получаем длительность оцифровки 10 мс
     
@@ -207,6 +227,18 @@ private:
     int _volMin = 0, _volMax = 100, _trsh = 0;
     int _pulseTrsh = 80, _pulseMin = 0, _pulseTout = 100;
     bool _pulse = 0, _pulseState = 0, _first = 0;
+=======
+    int _period = 4;    // 4 мс между выборами достаточно
+    int _ampliDt = 150;
+    int _window = 20;   // при таком размере окна получаем длительность оцифровки вполне хватает
+    uint32_t tmr1 = 0, tmr2 = 0, tmr3 = 0;
+    int raw = 0;
+    int rawMax = 0;
+    int max = 0, count = 0;
+    int maxs = 0, mins = 1023;
+    int _volMin = 0, _volMax = 100, _trsh = 30;
+    bool _pulse = 0, _first = 0;    
+>>>>>>> aed097ca265e4e5a09eda34c0b0980c8b2828623
     FastFilterVA minF, maxF, volF;
 };
 #endif
