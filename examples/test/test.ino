@@ -9,12 +9,12 @@ void setup() {
 
 void loop() {
   if (analyzer.tick()) {
-    Serial.print(analyzer.getVol());
+    Serial.print(analyzer.getPulse() * 20); // скачок громкости
     Serial.print(',');
-    Serial.print(analyzer.getRaw());
+    Serial.print(analyzer.getVol());    // громкость 0-100
     Serial.print(',');
-    Serial.print(analyzer.getMin());
+    Serial.print(analyzer.getRaw());    // сырая величина
     Serial.print(',');
-    Serial.println(analyzer.getMax());
+    Serial.println(analyzer.getMax());  // амплитудная огибающая
   }
 }

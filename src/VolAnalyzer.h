@@ -19,26 +19,83 @@
     v1.2 - +совместимость. Вернул плавное падение звука
     v1.3 - упрощение алгоритма. Новый обработчик импульсов
     v1.4 - улучшение алгоритма
+    v1.5 - сильное облегчение и улучшение алгоритма
 */
 
-#ifndef VolAnalyzer_h
-#define VolAnalyzer_h
+#ifndef _VolAnalyzer_h
+#define _VolAnalyzer_h
 #include <Arduino.h>
-#include "FastFilterVA.h"
 
+// ========================== FFilter ==========================
+struct FFilter {
+    bool compute() {
+        if (millis() - tmr >= dt) {
+            tmr = millis();
+            uint8_t kk = (raw < fil) ? k : (k >> 1);    // вверх с коэффициентом /2
+            fil = (kk * fil + (32 - kk) * raw) >> 5;    // целочисленный фильтр 5 бит
+            return 1;
+        }
+        return 0;
+    }
+    uint8_t k = 20;
+    int16_t dt = 0, fil = 0, raw = 0;
+    uint32_t tmr = 0;
+};
+
+// ========================== VolAnalyzer ==========================
 class VolAnalyzer {
 public:
     // создать с указанием пина. Если не указывать - будет виртуальный анализатор
     VolAnalyzer (int pin = -1) {
-        volF.setDt(20);
-        volF.setPass(FF_PASS_MAX);
-        maxF.setPass(FF_PASS_MAX);
-        minF.setPass(FF_PASS_MIN);
+        setVolDt(20);
         setVolK(25);
+        setAmpliDt(150);
         setAmpliK(30);
         if (pin != -1) setPin(pin);
     }
     
+    // =========================== TICK ===========================
+    // опрашивать как можно чаще. Может принимать значение, если это виртуальный анализатор
+    // вернёт true при окончании анализа выборки
+    bool tick(int read = -1) {
+        volF.compute();                     // сглаживание громкости
+        if (ampF.compute()) _ampli = 0;     // сглаживание амплитуды, сброс максимума
+
+        // таймер выборки
+        if (_dt == 0 || micros() - _tmrDt >= _dt) {
+            if (_dt) _tmrDt = micros();
+            if (read == -1) read = analogRead(_pin);
+            _max = max(_max, read);         // поиск макс за выборку
+            _min = min(_min, read);         // поиск мин за выборку
+
+            if (++count >= _window) {       // выборка завершена
+                _raw = _max - _min;         // сырая громкость
+                _ampli = max(_ampli, _raw); // амплитудная огибающая
+                ampF.raw = _ampli;          // передаём в фильтр
+
+                // от порога _trsh до сглаженной амплитуды в (_volMin, _volMax)
+                if (_raw > _trsh) volF.raw = constrain(map(_raw, _trsh, ampF.fil, _volMin, _volMax), _volMin, _volMax);
+                else volF.raw = 0;
+                
+                // обработка пульса
+                if (!_pulseState) {
+                    if (volF.raw <= _pulseMin && millis() - _tmrPulse >= _pulseTout) _pulseState = 1;
+                } else {
+                    if (volF.raw > _pulseTrsh) {
+                        _pulseState = 0;
+                        _pulse = 1;
+                        _tmrPulse = millis();
+                    }
+                }
+                _max = count = 0;
+                _min = 30000;
+                return true;        // выборка завершена
+            }
+        }
+        return false;
+    }
+    
+    // ========================== SETTINGS ==========================
     // указать пин АЦП
     void setPin(int pin) {
         _pin = pin;
@@ -50,24 +107,30 @@ public:
         _dt = dt;
     }
     
-    // УСТАРЕЛО! установить период между выборками
-    void setPeriod(int period) {
-        //_period = period;
-    }
-    
     // установка ширины окна выборки (по умолч. 20)
     void setWindow(int window) {
         _window = window;
     }
     
+    // установить порог громкости в единицах АЦП (умолч 40)
+    void setTrsh(int trsh) {
+        _trsh = trsh;
+    }
+    
+    // ========================== VOLUME ==========================
     // установить период фильтрации громкости (умолч 20)
-    void setVolDt(int volDt) {
-        volF.setDt(volDt);
+    void setVolDt(int dt) {
+        volF.dt = dt;
+    }
+    
+    // установить коэффициент плавности громкости 0-31 (умолч 25)
+    void setVolK(byte vk) {
+        volF.k = vk;
     }
     
     // получить громкость в пределах setVolMin.. setVolMax
     int getVol() {
-        return volF.getFil();
+        return volF.fil;
     }
     
     // установить минимальную величину громкости (умолч 0)
@@ -80,27 +143,28 @@ public:
         _volMax = scale;
     }
     
-    // установить порог громкости в единицах АЦП (умолч 30)
-    void setTrsh(int trsh) {
-        _trsh = trsh;
-    }
-    
+    // ========================= AMPLITUDE =========================
     // установить период фильтрации амплитудных огибающих
-    void setAmpliDt(int ampliDt) {
-        _ampliDt = ampliDt;
-    }	
-    
-    // установить коэффициент фильтрации громкости 0-31 (умолч 25)
-    void setVolK(byte k) {
-        volF.setK(k);
+    void setAmpliDt(int dt) {
+        ampF.dt = dt;
     }
     
-    // установить коэффициент фильтрации амплитудных огибающих 0-31 (умолч 31)
-    void setAmpliK(byte k) {
-        maxF.setK(k);
-        minF.setK(k);
-    }    
+    // установить коэффициент плавности амплитуды 0-31 (умолч 31)
+    void setAmpliK(byte rk) {
+        ampF.k = rk;
+    }
     
+    // получить текущее значение огибающей минимумов (с v1.5 - 0)
+    int getMin() {
+        return 0;
+    }
+
+    // получить текущее значение огибающей максимумов
+    int getMax() {
+        return ampF.fil;
+    }
+    
+    // =========================== PULSE ===========================
     // верхний порог срабатывания пульса (по шкале громкости)
     void setPulseTrsh(int trsh) {
         _pulseTrsh = trsh;
@@ -125,90 +189,29 @@ public:
         return false;
     }
     
-    // получить текущее значение огибающей минимумов
-    int getMin() {
-        return minF.getFil();
-    }
-    
-    // получить текущее значение огибающей максимумов
-    int getMax() {
-        return maxF.getFil();
-    }
-    
-    // получить значение сырого сигнала
+    // ========================== RAW DATA ===========================
+    // получить значение сырого сигнала за выборку
     int getRaw() {
         return _raw;
     }
     
-    // получить максимальное значение сырого сигнала за выборку
-    int getRawMax() {
-        return _rawMax;
-    }
-    
-    // опрашивать как можно чаще. Может принимать значение, если это виртуальный анализатор
-    // вернёт true при окончании анализа выборки
-    bool tick(int thisRead = -1) {
-        volF.compute();
-        if (millis() - _tmrAmpli >= _ampliDt) {         // таймер сглаживания амплитуды
-            _tmrAmpli = millis();
-            maxF.setRaw(_maxs);
-            minF.setRaw(_mins);
-            maxF.compute();
-            minF.compute();
-            _maxs = 0;
-            _mins = 1023;
-        }
-        if (_dt == 0 || micros() - _tmrDt >= _dt) {     // таймер выборки
-            _tmrDt = micros();
-            if (thisRead == -1) thisRead = analogRead(_pin);
-            if (thisRead > _max) _max = thisRead;       // ищем максимум
-            if (!_first) {                              // первый запуск
-                _first = 1;
-                maxF.setFil(thisRead);
-                minF.setFil(thisRead);
-            }
-
-            if (++count >= _window) {               // выборка завершена
-                _raw = _max;                        // запомнили
-                if (_max > _maxs) _maxs = _max;     // максимумы среди максимумов
-                if (_max < _mins) _mins = _max;     // минимумы реди максимумов
-                _rawMax = _maxs;                    // запомнили
-                if (getMax() - getMin() < _trsh) _max = 0; // если окно громкости меньше порога, то 0
-                else _max = constrain(map(_max, getMin(), getMax(), _volMin, _volMax), _volMin, _volMax); // перевод в громкость
-                volF.setRaw(_max);                  // фильтр столбика громкости
-                
-                // обработка пульса
-                if (!_pulseState) {
-                    if (_max <= _pulseMin && millis() - _tmrPulse >= _pulseTout) _pulseState = 1;
-                } else {
-                    if (_max > _pulseTrsh) {
-                        _pulseState = 0;
-                        _pulse = 1;
-                        _tmrPulse = millis();
-                    }
-                }
-                _max = count = 0;
-                return true;                              // выборка завершена
-            }
-        }
-        return false;
-    }    
+    // ========================= DEPRECATED =========================
+    void setPeriod(int v) {}            // установить период между выборками
+    int getRawMax() { return _raw; }    // получить максимальное значение сырого сигнала за выборку
 
 private:
-    // дефолты
     int _dt = 500;      // 500 мкс между сэмплами достаточно для музыки
-    int _ampliDt = 150; // сглаживание амплитудных огибающих
     int _window = 20;   // при таком размере окна получаем длительность оцифровки 10 мс
+    int _trsh = 40;
+    int _volMin = 0, _volMax = 100;
     
-    int _pin;
-    uint32_t _tmrPulse = 0, _tmrDt = 0, _tmrAmpli = 0;
-    int _raw = 0, _rawMax = 0;
-    int _max = 0, _maxs = 0, _mins = 1023;
-    int count = 0;
-    int _volMin = 0, _volMax = 100, _trsh = 0;
+    uint32_t _tmrPulse = 0, _tmrDt = 0;
+    int _pin, count = 0;
+    int _min = 30000, _max = 0, _ampli = 0, _raw = 0;
+    
     int _pulseTrsh = 80, _pulseMin = 0, _pulseTout = 100;
-    bool _pulse = 0, _pulseState = 0, _first = 0;
+    bool _pulse = 0, _pulseState = 0;
 
-    FastFilterVA minF, maxF, volF;
+    FFilter volF, ampF;
 };
 #endif
