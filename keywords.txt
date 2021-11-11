@@ -27,8 +27,8 @@ getMin	KEYWORD2
 getMax	KEYWORD2
 tick	KEYWORD2
 getRaw	KEYWORD2
-getPulse	KEYWORD2
-setPulseTrsh	KEYWORD2
+pulse	KEYWORD2
+setPulseMax	KEYWORD2
 setPulseMin	KEYWORD2
 setPulseTimeout	KEYWORD2
 

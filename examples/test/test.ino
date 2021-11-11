@@ -9,7 +9,7 @@ void setup() {
 
 void loop() {
   if (analyzer.tick()) {
-    Serial.print(analyzer.getPulse() * 20); // скачок громкости
+    Serial.print(analyzer.pulse() * 20); // скачок громкости
     Serial.print(',');
     Serial.print(analyzer.getVol());    // громкость 0-100
     Serial.print(',');

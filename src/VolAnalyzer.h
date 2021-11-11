@@ -20,6 +20,40 @@
     v1.3 - упрощение алгоритма. Новый обработчик импульсов
     v1.4 - улучшение алгоритма
     v1.5 - сильное облегчение и улучшение алгоритма
+    v1.6 - более резкая реакция на звук
+*/
+
+/*
+    // тикер анализатора. Вернёт true при завершении текущего анализа. Вызывать почаще
+    bool tick();                    // опрашивает указанный в setPin пин
+    bool tick(int thisRead);        // берёт указанное значение
+
+    // настройки анализа
+    void setPin(int pin);           // указать пин АЦП
+    void setDt(int dt);             // установить время между опросами АЦП, мкс (по умолч. 500)
+    void setWindow(int window);     // установка ширины окна выборки (по умолч. 20)
+    void setTrsh(int trsh);         // установить порог громкости в единицах raw АЦП (умолч 40)
+
+    // амплитуда
+    void setAmpliDt(int ampliDt);   // установить период фильтрации амплитудных огибающих, мс (умолч 150)
+    void setAmpliK(byte k);         // установить коэффициент фильтрации амплитудных огибающих 0-31 (умолч 30)
+
+    // громкость
+    void setVolDt(int volDt);       // установить период фильтрации громкости (умолч 20)
+    void setVolK(byte k);           // установить коэффициент фильтрации громкости 0-31 (умолч 25)
+    void setVolMin(int scale);      // установить минимальную величину громкости (умолч 0)
+    void setVolMax(int scale);      // установить максимальную величину громкости (умолч 100)
+
+    // пульс
+    void setPulseMax(int maxV);     // верхний порог срабатывания пульса (по шкале громкости)
+    void setPulseMin(int minV);     // нижний порог перезагрузки пульса (по шкале громкости)
+    void setPulseTimeout(int tout); // таймаут пульса, мс
+
+    // получаем значения
+    int getVol();                   // громкость в пределах setVolMin.. setVolMax
+    bool pulse();                   // резкий скачок громкости
+    int getMax();                   // текущее значение огибающей максимумов
+    int getRaw();                   // значение сырого сигнала
 */
 
 #ifndef _VolAnalyzer_h
@@ -28,8 +62,8 @@
 
 // ========================== FFilter ==========================
 struct FFilter {
-    bool compute() {
-        if (millis() - tmr >= dt) {
+    bool compute(bool force = false) {
+        if (force || millis() - tmr >= dt) {
             tmr = millis();
             uint8_t kk = (raw < fil) ? k : (k >> 1);    // вверх с коэффициентом /2
             fil = (kk * fil + (32 - kk) * raw) >> 5;    // целочисленный фильтр 5 бит
@@ -73,15 +107,19 @@ public:
                 _ampli = max(_ampli, _raw); // амплитудная огибающая
                 ampF.raw = _ampli;          // передаём в фильтр
 
-                // от порога _trsh до сглаженной амплитуды в (_volMin, _volMax)
-                if (_raw > _trsh) volF.raw = constrain(map(_raw, _trsh, ampF.fil, _volMin, _volMax), _volMin, _volMax);
-                else volF.raw = 0;
+                if (_raw > ampF.fil) ampF.compute(true);    // форсируем фильтр
+                
+                if (_raw > _trsh) {
+                    // от порога _trsh до сглаженной амплитуды в (_volMin, _volMax)
+                    volF.raw = constrain(map(_raw, _trsh, ampF.fil, _volMin, _volMax), _volMin, _volMax);
+                    volF.compute(true);    // форсируем фильтр
+                } else volF.raw = 0;
                 
                 // обработка пульса
                 if (!_pulseState) {
                     if (volF.raw <= _pulseMin && millis() - _tmrPulse >= _pulseTout) _pulseState = 1;
                 } else {
-                    if (volF.raw > _pulseTrsh) {
+                    if (volF.raw > _pulseMax) {
                         _pulseState = 0;
                         _pulse = 1;
                         _tmrPulse = millis();
@@ -166,8 +204,8 @@ public:
     
     // =========================== PULSE ===========================
     // верхний порог срабатывания пульса (по шкале громкости)
-    void setPulseTrsh(int trsh) {
-        _pulseTrsh = trsh;
+    void setPulseMax(int maxV) {
+        _pulseMax = maxV;
     }
     
     // нижний порог перезагрузки пульса (по шкале громкости)
@@ -181,7 +219,7 @@ public:
     }
     
     // резкий скачок громкости (true)
-    bool getPulse() {
+    bool pulse() {
         if (_pulse) {
             _pulse = false;
             return true;
@@ -198,6 +236,8 @@ public:
     // ========================= DEPRECATED =========================
     void setPeriod(int v) {}            // установить период между выборками
     int getRawMax() { return _raw; }    // получить максимальное значение сырого сигнала за выборку
+    bool getPulse() { return pulse(); }
+    void setPulseTrsh(int trsh) { setPulseMax(trsh); }
 
 private:
     int _dt = 500;      // 500 мкс между сэмплами достаточно для музыки
@@ -209,7 +249,7 @@ private:
     int _pin, count = 0;
     int _min = 30000, _max = 0, _ampli = 0, _raw = 0;
     
-    int _pulseTrsh = 80, _pulseMin = 0, _pulseTout = 100;
+    int _pulseMax = 80, _pulseMin = 20, _pulseTout = 100;
     bool _pulse = 0, _pulseState = 0;
 
     FFilter volF, ampF;
