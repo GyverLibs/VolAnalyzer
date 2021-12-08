@@ -21,6 +21,7 @@
     v1.4 - улучшение алгоритма
     v1.5 - сильное облегчение и улучшение алгоритма
     v1.6 - более резкая реакция на звук
+    v1.7 - исключено деление на 0 в map
 */
 
 /*
@@ -72,7 +73,7 @@ struct FFilter {
         return 0;
     }
     uint8_t k = 20;
-    int16_t dt = 0, fil = 0, raw = 0;
+    int dt = 0, fil = 0, raw = 0;
     uint32_t tmr = 0;
 };
 
@@ -109,9 +110,10 @@ public:
 
                 if (_raw > ampF.fil) ampF.compute(true);    // форсируем фильтр
                 
-                if (_raw > _trsh) {
+                if (_raw > _trsh && ampF.fil > _trsh) {     // если звук громкий + в map не будет 0
                     // от порога _trsh до сглаженной амплитуды в (_volMin, _volMax)
-                    volF.raw = constrain(map(_raw, _trsh, ampF.fil, _volMin, _volMax), _volMin, _volMax);
+                    volF.raw = map(_raw, _trsh, ampF.fil, _volMin, _volMax);
+                    volF.raw = constrain(volF.raw, _volMin, _volMax);
                     volF.compute(true);    // форсируем фильтр
                 } else volF.raw = 0;
                 
