@@ -67,7 +67,7 @@ struct FFilter {
         if (force || millis() - tmr >= dt) {
             tmr = millis();
             uint8_t kk = (raw < fil) ? k : (k >> 1);    // вверх с коэффициентом /2
-            fil = (kk * fil + (32 - kk) * raw) >> 5;    // целочисленный фильтр 5 бит
+            fil = ((uint32_t)kk * fil + (32 - kk) * raw) >> 5;    // целочисленный фильтр 5 бит
             return 1;
         }
         return 0;
