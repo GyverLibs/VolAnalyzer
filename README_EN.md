@@ -1,3 +1,5 @@
+This is an automatic translation, may be incorrect in some places. See sources and examples!
+
 # VolAnalyzer
 Library for amplitude sound analysis on Arduino
 - Cunning adaptive algorithm
